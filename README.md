@@ -22,7 +22,21 @@
 
 ##  Overview
 
-<code>❯ REPLACE-ME</code>
+<code>❯ *Malfuzat Explorer*
+
+A Web Application for Exploring Malfuzat
+
+Malfuzat Explorer is an open-source web app designed to facilitate easy search and explorationof Malfuzat - compilation of the sayings of the Promised Messiah, Hazrat Mirza Ghulam Ahmad. With advanced search, multi-lingual support (Arabic & Urdu):
+
+- Provide easy access to Malfuzat for research and spiritual growth
+- Facilitate understanding and exploration of Islamic teachings
+- Promote preservation and dissemination of Malfuzat
+
+Built with ASP.NET core MVC with Arabic/Urdu font support.
+
+Contribute to improve and expand Malfuzat Explorer! Review our guidelines and join our community.
+
+*Contact:* [abdulawwalintisor777@gmail.com/ https://www.linkedin.com/in/intitech07/ ]</code>
 
 ---
 
