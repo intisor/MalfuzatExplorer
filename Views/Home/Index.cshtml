@@ -1,0 +1,80 @@
+﻿@model MalfuzatExplorer.Models.MalfuzatModel
+@{
+    ViewData["Title"] = "Home Page";
+}
+<div class="container">
+    <h2 class="display-4">Welcome to Malfuzat Explorer</h2>
+    <p>Search for your favorite Malfuzat contents</p>
+@if (Model!= null)
+{
+    <form asp-action="Search" method="post" class="mb-4">
+        <div class="form-group">
+            <div class="row">
+                <div class="col-md-9">
+                    <input type="text" name="Query" value="@Model.Query" class="form-control" />
+                </div>
+                <div class="col-md-3">
+                    <button type="submit" class="btn btn-primary w-100">Search</button>
+                </div>
+            </div>
+        </div>
+    </form>
+    @if (Model.Results.Count > 0)
+    {
+        <h4>Search Results: (@Model.Results.Count) </h4>
+        <ul class="list-group">
+            @for (int i = 0; i < Model.Results.Count; i++)
+            {
+                var item = Model.Results[i];
+                var cssClass = i % 2 == 0 ? "list-group-item even" : "list-group-item odd";
+                <li class="@cssClass">
+                    <p>@Html.Raw(item)</p>
+                </li>
+            }
+        </ul>
+    }
+     
+}
+</div>
+
+<style>
+    mark {
+        background-color: yellow; 
+        color: black; 
+    }
+    .special[dir="rtl"] {
+        text-align: right;
+        direction: rtl;
+        color: limegreen;
+        font-weight: bold;
+        font-family: 'Noto Nastaliq Urdu', 'Amiri', serif;  
+    }
+
+    .container {
+        max-width: 800px;
+        margin: 50px auto;
+        padding: 20px;
+        background-color: #fff;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        border-radius: 8px;
+    }
+
+    .btn:hover {
+        background-color: #0056b3;
+    }
+
+    .list-group-item {
+        padding: 1rem;
+        margin-bottom: 0.5rem;
+        background-color: #f8f9fa;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+    }
+    .list-group-item.odd {
+        background-color: #f8f9fa;
+    }
+
+    .list-group-item.even {
+        background-color: #d1ecf1;
+    }
+</style> 
