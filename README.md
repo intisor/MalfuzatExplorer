@@ -28,7 +28,7 @@
 
 ##  Features
 
-<code>❯ •Sfan through the Malfuzat for user query</code>
+<code>❯ • Scan through the Malfuzat for user query</code>
 
 ---
 
