@@ -5,7 +5,7 @@
     <h1 align="center">MALFUZATEXPLORER</h1>
 </p>
 <p align="center">
-	<img src="https://img.shields.io/github/last-commit/intisor/MalfuzatExplorer?style=flat&logo=git&logoColor=white&color=35cb2d" alt="last-commit">
+	
 </p>
 
 <br>
@@ -28,7 +28,7 @@
 
 ##  Features
 
-<code>❯ REPLACE-ME</code>
+<code>❯ •Sfan through the Malfuzat for user query</code>
 
 ---
 
@@ -191,9 +191,9 @@ Build the project from source:
 
 ##  Project Roadmap
 
-- [X] **`Task 1`**: <strike>Implement IText7 Library for document processing.</strike>
-- [ ] **`Task 2`**: Did some business logics.
-- [ ] **`Task 3`**: Designed the UI.
+- [X] **`Task 1`**: Implemented IText7 Library for document processing.
+- [X] **`Task 2`**: Did some business logics.
+- [X] **`Task 3`**: Designed the UI.
 
 ---
 
