@@ -5,7 +5,7 @@
     <h1 align="center">MALFUZATEXPLORER</h1>
 </p>
 <p align="center">
-	<img src="https://img.shields.io/github/last-commit/intisor/MalfuzatExplorer?style=flat&logo=git&logoColor=white&color=35cb2d" alt="last-commit">
+	
 </p>
 
 <br>
@@ -22,13 +22,27 @@
 
 ##  Overview
 
-<code>❯ REPLACE-ME</code>
+<code>❯ *Malfuzat Explorer*
+
+A Web Application for Exploring Malfuzat
+
+Malfuzat Explorer is an open-source web app designed to facilitate easy search and explorationof Malfuzat - compilation of the sayings of the Promised Messiah, Hazrat Mirza Ghulam Ahmad. With advanced search, multi-lingual support (Arabic & Urdu):
+
+- Provide easy access to Malfuzat for research and spiritual growth
+- Facilitate understanding and exploration of Islamic teachings
+- Promote preservation and dissemination of Malfuzat
+
+Built with ASP.NET core MVC with Arabic/Urdu font support.
+
+Contribute to improve and expand Malfuzat Explorer! Review our guidelines and join our community.
+
+*Contact:* [abdulawwalintisor777@gmail.com/   - https://www.linkedin.com/in/intitech07/ ]</code>
 
 ---
 
 ##  Features
 
-<code>❯ REPLACE-ME</code>
+<code>❯ • Scan through the Malfuzat for user query</code>
 
 ---
 
@@ -191,9 +205,9 @@ Build the project from source:
 
 ##  Project Roadmap
 
-- [X] **`Task 1`**: <strike>Implement IText7 Library for document processing.</strike>
-- [ ] **`Task 2`**: Did some business logics.
-- [ ] **`Task 3`**: Designed the UI.
+- [X] **`Task 1`**: Implemented IText7 Library for document processing.
+- [X] **`Task 2`**: Did some business logics.
+- [X] **`Task 3`**: Designed the UI.
 
 ---
 
