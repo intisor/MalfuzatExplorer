@@ -32,6 +32,16 @@
         </nav>
     </header>
     <div class="container">
+<div id="preloader">
+    <img src="~/preloader.gif" alt="Loading..." />
+</div>
+<script>
+    window.addEventListener('load', function() {
+        setTimeout(function() {
+            document.getElementById('preloader').style.display = 'none';
+        }, 5000);
+    });
+</script>
         <main role="main" class="pb-3">
             @RenderBody()
         </main>
