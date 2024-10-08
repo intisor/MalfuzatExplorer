@@ -15,6 +15,10 @@ namespace MalfuzatExplorer.Controllers
         Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "Malfuzat", "Malfuzat-2.pdf"),
         Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "Malfuzat", "Malfuzat-3.pdf"),
         Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "Malfuzat", "Malfuzat-4.pdf")
+        Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "Malfuzat", "Malfuzat-7.pdf"),
+        Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "Malfuzat", "Malfuzat-8.pdf"),
+        Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "Malfuzat", "Malfuzat-9.pdf")
+        Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "Malfuzat", "Malfuzat-10.pdf")
     };
 
         public IActionResult Index()
