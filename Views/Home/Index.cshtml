@@ -22,6 +22,7 @@
     @if (Model.Results.Count > 0)
     {
         <h4>Search Results: (@Model.Results.Count) </h4>
+       <div class="results-wrapper">
         <ul class="list-group">
             @for (int i = 0; i < Model.Results.Count; i++)
             {
@@ -32,6 +33,7 @@
                 </li>
             }
         </ul>
+      </div>
     }
      
 }
@@ -49,7 +51,6 @@
         font-weight: bold;
         font-family: 'Noto Nastaliq Urdu', 'Amiri', serif;  
     }
-
     .container {
         max-width: 800px;
         margin: 50px auto;
@@ -69,6 +70,9 @@
         background-color: #f8f9fa;
         border: 1px solid #ddd;
         border-radius: 4px;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        white-space: pre-wrap;
     }
     .list-group-item.odd {
         background-color: #f8f9fa;
@@ -76,5 +80,15 @@
 
     .list-group-item.even {
         background-color: #d1ecf1;
+    }
+    .results-wrapper {
+        overflow-x: auto;
+    }
+
+    @media (max-width: 768px) {
+        .results-wrapper {
+            max-width: 100%;
+            overflow-x: scroll;
+        }
     }
 </style> 
