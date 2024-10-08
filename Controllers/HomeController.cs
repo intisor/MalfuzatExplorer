@@ -9,8 +9,13 @@ namespace MalfuzatExplorer.Controllers
 {
     public class HomeController : Controller
     {
-        private string pdfPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "Malfuzat", "Malfuzat-1.pdf");
-       
+       private string[] pdfFiles = new string[]
+    {
+        Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "Malfuzat", "Malfuzat-1.pdf"),
+        Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "Malfuzat", "Malfuzat-2.pdf"),
+        Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "Malfuzat", "Malfuzat-3.pdf"),
+        Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "Malfuzat", "Malfuzat-4.pdf")
+    };
 
         public IActionResult Index()
         {
@@ -55,6 +60,8 @@ namespace MalfuzatExplorer.Controllers
             List<string> results = new List<string>();
             try
             {
+             foreach (var pdfPath in pdfFiles)
+            { 
                 if (!System.IO.File.Exists(pdfPath))
                 {
                     throw new FileNotFoundException("PDF file not found.");
@@ -70,12 +77,12 @@ namespace MalfuzatExplorer.Controllers
                             string pageText = PdfTextExtractor.GetTextFromPage(document.GetPage(i));
                             if (pageText.Contains(query, StringComparison.OrdinalIgnoreCase))
                             {
-                                string result =  $"Found on leaf {i}: " + await GetContextAroundQueryAsync(pageText, query);
-                               
-                                   results.Add(result);
+                                string result = $"Found in {Path.GetFileNameWithoutExtension(pdfPath)} on leaf {i}: " + await GetContextAroundQueryAsync(pageText, query);
+                            results.Add(result);
                             }
                     }
                 }
+             }
             }
             catch (Exception ex) 
             {
