@@ -36,7 +36,7 @@ Built with ASP.NET core MVC with Arabic/Urdu font support.
 
 Contribute to improve and expand Malfuzat Explorer! Review our guidelines and join our community.
 
-*Contact:* [abdulawwalintisor777@gmail.com/   - https://www.linkedin.com/in/intitech07/ ]</code>
+*Contact:* [abdulawwalintisor777@gmail.com   - https://www.linkedin.com/in/intitech07 ]</code>
 
 ---
 
