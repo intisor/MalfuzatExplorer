@@ -2,7 +2,7 @@
   <img src="https://img.icons8.com/?size=512&id=55494&format=png" width="20%" alt="MALFUZATEXPLORER-logo">
 </p>
 <p align="center">
-    <h1 align="center">MALFUZAT EXPLORER</h1>
+    <h1 align="center">MALFUZATEXPLORER</h1>
 </p>
 <p align="center">
     <em>Advanced Search and Exploration of Islamic Spiritual Teachings</em>
@@ -114,7 +114,7 @@ Malfuzat (Arabic: مَلْفُوظَات, literally "utterances" or "sayings") i
 
 ### Development Tools
 
-- **Visual Studio 2022** - Primary IDE (Version 17.10+)
+- **Visual Studio 2022** - Primary IDE (Version 17.8+)
 - **Git** - Version control
 - **GitHub Actions** - CI/CD pipeline
 - **Azure Web Apps** - Cloud hosting platform
@@ -194,7 +194,7 @@ Before running this application, ensure you have the following installed:
   ```
 
 - **Visual Studio 2022** (recommended) or **Visual Studio Code** with C# extension
-  - Visual Studio 2022 version 17.8 or later recommended
+  - Visual Studio 2022 version 17.8+ recommended for best compatibility
   
 - **Git** for version control ([Download](https://git-scm.com/downloads))
 
@@ -811,6 +811,10 @@ This project is open-source and available for use in accordance with standard op
    <a href="https://github.com/intisor/MalfuzatExplorer/graphs/contributors">
       <img src="https://contrib.rocks/image?repo=intisor/MalfuzatExplorer" alt="Contributors">
    </a>
+</p>
+
+<p align="center">
+  <em>Contributor graph will be populated as contributions are made to the project</em>
 </p>
 
 <p align="center">
