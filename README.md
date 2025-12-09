@@ -526,9 +526,9 @@ public class ErrorViewModel
 
 The search logic is centralized in `SearchPdfForQueryAsync()`. Key areas to modify:
 
-- **Search Algorithm**: Line 82 - `pageText.Contains(query, ...)`
-- **Context Size**: Line 108 - Change `100` to adjust word count
-- **Highlighting**: `HighlightQueryAsync()` method
+- **Search Algorithm**: The query matching logic in `SearchPdfForQueryAsync()`
+- **Context Size**: Adjust the word count parameters in `GetContextAroundQueryAsync()` (currently 100 words before/after)
+- **Highlighting**: Modify the `HighlightQueryAsync()` method for different highlight styles
 
 ### Building and Testing
 
@@ -796,7 +796,7 @@ This project is open-source and available for use in accordance with standard op
 
 ## 🌐 Additional Resources
 
-- **ASP.NET Core Documentation**: [https://docs.microsoft.com/aspnet/core](https://docs.microsoft.com/aspnet/core)
+- **ASP.NET Core Documentation**: [https://learn.microsoft.com/aspnet/core](https://learn.microsoft.com/aspnet/core)
 - **iText7 Documentation**: [https://itextpdf.com/products/itext-7](https://itextpdf.com/products/itext-7)
 - **Bootstrap Documentation**: [https://getbootstrap.com/docs](https://getbootstrap.com/docs)
 - **Ahmadiyya Muslim Community**: [https://www.alislam.org](https://www.alislam.org)
