@@ -1,77 +1,55 @@
 ﻿@model MalfuzatExplorer.Models.MalfuzatModel
-@inject MalfuzatExplorer.Services.IPdfCacheService _pdfCache
 @{
     ViewData["Title"] = "Home Page";
 }
 <div class="container">
     <h2 class="display-4">Welcome to Malfuzat Explorer</h2>
     <p>Search for your favorite Malfuzat contents</p>
-
-    <!-- Loading Banner -->
-    <div id="cache-banner" class="cache-banner">
-        <div class="cache-banner-inner">
-            <span class="spinner"></span>
-            <span id="cache-status-text">Indexing Malfuzat volumes into memory&hellip;</span>
-        </div>
-        <div class="cache-progress-track">
-            <div class="cache-progress-bar"></div>
-        </div>
-    </div>
-
-@if (Model != null)
+@if (Model!= null)
 {
-    <form asp-action="Search" method="post" class="mb-4" id="search-form">
+    <form asp-action="Search" method="post" class="mb-4">
         <div class="form-group">
             <div class="row">
                 <div class="col-md-9">
-                    <input type="text" name="Query" value="@Model.Query" class="form-control" id="search-input" />
+                    <input type="text" name="Query" value="@Model.Query" class="form-control" />
                 </div>
                 <div class="col-md-3">
-                    <button type="submit" class="btn btn-primary w-100" id="search-btn" disabled>
-                        <span id="btn-text">Preparing&hellip;</span>
-                    </button>
+                    <button type="submit" class="btn btn-primary w-100">Search</button>
                 </div>
             </div>
         </div>
     </form>
     @if (Model.Results.Count > 0)
     {
-        <h4>Search Results: (@Model.TotalResults)</h4>
-        <div class="results-wrapper">
-            <ul class="list-group">
-                @for (int i = 0; i < Model.Results.Count; i++)
-                {
-                    var item = Model.Results[i];
-                    var cssClass = i % 2 == 0 ? "list-group-item even" : "list-group-item odd";
-                    <li class="@cssClass">
-                        <div class="result-meta">
-                            <span class="badge bg-primary volume-badge">@item.Volume</span>
-                            <span class="badge bg-secondary">Leaf @item.PageNumber</span>
-                        </div>
-                        <p class="mt-2 mb-0">@Html.Raw(item.Snippet)</p>
-                    </li>
-                }
-            </ul>
-        </div>
+        <h4>Search Results: (@Model.Results.Count) </h4>
+       <div class="results-wrapper">
+        <ul class="list-group">
+            @for (int i = 0; i < Model.Results.Count; i++)
+            {
+                var item = Model.Results[i];
+                var cssClass = i % 2 == 0 ? "list-group-item even" : "list-group-item odd";
+                <li class="@cssClass">
+                    <p>@Html.Raw(item)</p>
+                </li>
+            }
+        </ul>
+      </div>
     }
-    else if (!string.IsNullOrEmpty(Model.Query))
-    {
-        <p class="text-muted">No results found for <strong>@Model.Query</strong>.</p>
-    }
+     
 }
 </div>
 
 <style>
     mark {
-        background-color: yellow;
-        color: black;
+        background-color: yellow; 
+        color: black; 
     }
     .special[dir="rtl"] {
         text-align: right;
         direction: rtl;
         color: limegreen;
         font-weight: bold;
-        font-family: 'Noto Nastaliq Urdu', 'Amiri', serif;
+        font-family: 'Noto Nastaliq Urdu', 'Amiri', serif;  
     }
     .container {
         max-width: 800px;
@@ -81,9 +59,11 @@
         box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
         border-radius: 8px;
     }
+
     .btn:hover {
         background-color: #0056b3;
     }
+
     .list-group-item {
         padding: 1rem;
         margin-bottom: 0.5rem;
@@ -97,117 +77,11 @@
     .list-group-item.odd {
         background-color: #f8f9fa;
     }
+
     .list-group-item.even {
         background-color: #d1ecf1;
     }
     .results-wrapper {
         overflow-x: auto;
     }
-    .result-meta {
-        display: flex;
-        gap: 0.5rem;
-        margin-bottom: 0.25rem;
-    }
-    .volume-badge {
-        font-size: 0.75rem;
-    }
-
-    /* Loading Banner */
-    .cache-banner {
-        background: #eef6ff;
-        border: 1px solid #b6d4fe;
-        border-radius: 6px;
-        padding: 12px 16px;
-        margin-bottom: 16px;
-        transition: opacity 0.6s ease, max-height 0.6s ease;
-        overflow: hidden;
-        max-height: 80px;
-    }
-    .cache-banner.hidden {
-        opacity: 0;
-        max-height: 0;
-        padding: 0;
-        margin: 0;
-        border: none;
-    }
-    .cache-banner-inner {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        font-size: 0.9rem;
-        color: #0c4a8a;
-        margin-bottom: 8px;
-    }
-    .cache-progress-track {
-        background: #cfe2ff;
-        border-radius: 4px;
-        height: 5px;
-        overflow: hidden;
-    }
-    .cache-progress-bar {
-        height: 100%;
-        width: 0%;
-        background: #0d6efd;
-        border-radius: 4px;
-        animation: indeterminate 1.8s ease-in-out infinite;
-    }
-    @@keyframes indeterminate {
-        0%   { transform: translateX(-100%) scaleX(0.4); }
-        50%  { transform: translateX(60%)  scaleX(0.6); }
-        100% { transform: translateX(200%) scaleX(0.4); }
-    }
-    .spinner {
-        display: inline-block;
-        width: 14px;
-        height: 14px;
-        border: 2px solid #b6d4fe;
-        border-top-color: #0d6efd;
-        border-radius: 50%;
-        animation: spin 0.7s linear infinite;
-        flex-shrink: 0;
-    }
-    @@keyframes spin {
-        to { transform: rotate(360deg); }
-    }
-</style>
-
-<script>
-    (function () {
-        const banner = document.getElementById('cache-banner');
-        const btn = document.getElementById('search-btn');
-        const btnText = document.getElementById('btn-text');
-        const statusText = document.getElementById('cache-status-text');
-
-        function checkCache() {
-            fetch('/Home/CacheStatus')
-                .then(r => r.json())
-                .then(data => {
-                    if (data.isLoaded) {
-                        statusText.textContent = 'All volumes ready.';
-                        btn.disabled = false;
-                        btnText.textContent = 'Search';
-                        setTimeout(() => banner.classList.add('hidden'), 800);
-                    } else {
-                        setTimeout(checkCache, 1500);
-                    }
-                })
-                .catch(() => setTimeout(checkCache, 2000));
-        }
-
-        // If the page already knows cache is loaded (e.g. after a search POST), skip polling
-        @if (_pdfCache.IsLoaded)
-        {
-            <text>
-            banner.classList.add('hidden');
-            btn.disabled = false;
-            btnText.textContent = 'Search';
-            </text>
-        }
-        else
-        {
-            <text>
-            checkCache();
-            </text>
-        }
-    })();
-</script>
+</style> 

@@ -1,60 +1,55 @@
-using MalfuzatExplorer.DTOs;
+using iText.Kernel.Pdf;
+using iText.Kernel.Pdf.Canvas.Parser;
 using MalfuzatExplorer.Models;
-using MalfuzatExplorer.Services;
 using Microsoft.AspNetCore.Mvc;
-using System.Collections.Concurrent;
 using System.Diagnostics;
-using System.Text.Encodings.Web;
 using System.Text.RegularExpressions;
 
 namespace MalfuzatExplorer.Controllers
 {
     public class HomeController : Controller
     {
-        private readonly IPdfCacheService _pdfCache;
-        private readonly ILogger<HomeController> _logger;
-
-        private static readonly string[] PdfFiles =
-        {
-            "Malfuzat-1.pdf",
-            "Malfuzat-2.pdf",
-            "Malfuzat-3.pdf",
-            "Malfuzat-4.pdf",
-            "Malfuzat-7.pdf",
-            "Malfuzat-8.pdf",
-            "Malfuzat-9.pdf",
-            "Malfuzat-10.pdf"
-        };
-
-        public HomeController(IPdfCacheService pdfCache, ILogger<HomeController> logger)
-        {
-            _pdfCache = pdfCache;
-            _logger = logger;
-        }
+       private string[] pdfFiles = new string[]
+    {
+        Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "Malfuzat", "Malfuzat-1.pdf"),
+        Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "Malfuzat", "Malfuzat-2.pdf"),
+        Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "Malfuzat", "Malfuzat-3.pdf"),
+        Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "Malfuzat", "Malfuzat-4.pdf"),
+        Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "Malfuzat", "Malfuzat-7.pdf"),
+        Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "Malfuzat", "Malfuzat-8.pdf"),
+        Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "Malfuzat", "Malfuzat-9.pdf"),
+        Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "Malfuzat", "Malfuzat-10.pdf")
+    };
 
         public IActionResult Index()
         {
             var model = new MalfuzatModel();
             return View(model);
         }
-
-        [HttpGet]
-        public IActionResult CacheStatus()
-        {
-            return Json(new { isLoaded = _pdfCache.IsLoaded });
-        }
         [HttpPost]
-        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Search(MalfuzatModel model)
         {
             if (string.IsNullOrEmpty(model.Query))
             {
-                ModelState.AddModelError("", "Please enter a valid search query.");
+                ModelState.AddModelError("", "Please enter a valid Search query.");
                 return View("Index", model);
             }
 
-            var results = await SearchPdfForQueryAsync(model.Query);
-            model.TotalResults = results.Count;
+            List<string> results = await SearchPdfForQueryAsync(model.Query);
+            if (results.Count == 0)
+            {
+                model.Results = new List<string> { $"No results found for '{model.Query}'." };
+            }
+            else
+            {
+                model.Results = results;
+            }
+
+            for (int i = 0; i < results.Count; i++)
+            {
+                results[i] = await SpecialLanguageAsync(results[i], model.Query);
+            }
+
             model.Results = results;
             return View("Index", model);
         }
@@ -64,82 +59,86 @@ namespace MalfuzatExplorer.Controllers
             return View();
         }
 
-        private async Task<List<SearchResultDto>> SearchPdfForQueryAsync(string query)
+        public async Task<List<string>> SearchPdfForQueryAsync(string query)
         {
-            if (!_pdfCache.IsLoaded)
-                return new List<SearchResultDto>();
-
+            List<string> results = new List<string>();
             try
             {
-                var bag = new ConcurrentBag<SearchResultDto>();
-                var tasks = PdfFiles.Select(pdfFileName => Task.Run(() =>
+             foreach (var pdfPath in pdfFiles)
+            { 
+                if (!System.IO.File.Exists(pdfPath))
                 {
-                    var pages = _pdfCache.GetPages(pdfFileName);
-                    if (pages is null)
-                    {
-                        _logger.LogWarning("PDF not found in cache: {FileName}", pdfFileName);
-                        return;
-                    }
+                    throw new FileNotFoundException("PDF file not found.");
+                }
 
-                    for (int i = 0; i < pages.Length; i++)
+                using (PdfReader reader = new PdfReader(pdfPath))
+                using (PdfDocument document = new PdfDocument(reader))
+                {
+          
+
+                    for (int i = 1; i <= document.GetNumberOfPages(); i++)
                     {
-                        if (pages[i].Contains(query, StringComparison.OrdinalIgnoreCase))
-                        {
-                            bag.Add(new SearchResultDto
+                            string pageText = PdfTextExtractor.GetTextFromPage(document.GetPage(i));
+                            if (pageText.Contains(query, StringComparison.OrdinalIgnoreCase))
                             {
-                                Volume = Path.GetFileNameWithoutExtension(pdfFileName),
-                                PageNumber = i + 1,
-                                Snippet = BuildSnippet(pages[i], query)
-                            });
-                        }
+                                string result = $"Found in {Path.GetFileNameWithoutExtension(pdfPath)} on leaf {i}: " + await GetContextAroundQueryAsync(pageText, query);
+                            results.Add(result);
+                            }
                     }
-                }));
-
-                await Task.WhenAll(tasks).ConfigureAwait(false);
-                return bag.ToList();
+                }
+             }
             }
-            catch (Exception ex)
+            catch (Exception ex) 
             {
-                _logger.LogError(ex, "Error during search for query: {Query}", query);
-                return new List<SearchResultDto>();
+                results.Add("An error occurred while searching the PDF.");
             }
+
+            return results;
         }
 
-        /// <summary>
-        /// Extracts a 200-word context window around the query term, HTML-encodes the raw
-        /// page text first (XSS fix), then re-injects safe &lt;mark&gt; and RTL span tags.
-        /// Synchronous — no I/O, no Task.Run wrapper needed.
-        /// </summary>
-        private static string BuildSnippet(string pageText, string query)
+        public async Task<string> GetContextAroundQueryAsync(string content, string query)
         {
             query = query.Trim();
+            string[] words = content.Split(new[] { ' ', '\n', '\r', '\t' }, StringSplitOptions.RemoveEmptyEntries);
 
-            // XSS fix: encode raw page content BEFORE any HTML is injected
-            string encoded = HtmlEncoder.Default.Encode(pageText);
-            string encodedQuery = HtmlEncoder.Default.Encode(query);
-
-            string[] words = encoded.Split(new[] { ' ', '\n', '\r', '\t' }, StringSplitOptions.RemoveEmptyEntries);
-            int idx = Array.FindIndex(words, w => w.Contains(encodedQuery, StringComparison.OrdinalIgnoreCase));
-            if (idx < 0) return string.Empty;
-
-            int start = Math.Max(0, idx - 100);
-            int end = Math.Min(words.Length, idx + 101);
-            string context = string.Join(" ", words.Skip(start).Take(end - start));
-
-            // Safe: <mark> injected AFTER encoding — cannot be abused
-            context = Regex.Replace(context, Regex.Escape(encodedQuery),
-                $"<mark>{encodedQuery}</mark>", RegexOptions.IgnoreCase);
-
-            // Wrap Arabic/Urdu script runs in a styled RTL span
-            context = Regex.Replace(context,
-                @"[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]+",
-                m => $"<span class=\"special\" dir=\"rtl\">{m.Value}</span>");
-
-            return context;
+            // Find the index of the query word in the words array
+            int queryIndex = Array.FindIndex(words, w => w.Contains(query, StringComparison.OrdinalIgnoreCase));
+            if (queryIndex < 0)
+                return "Query not found";
+            int start = Math.Max(0, queryIndex - 100);
+            int end = Math.Min(words.Length, queryIndex + 100 + query.Length);
+            string result = string.Join(" ", words.Skip(start).Take(end - start));
+            //result = result.Replace("\n", "<br/>").Replace("\r", "");
+            result = await HighlightQueryAsync(result, query);
+            return result;
         }
 
+
+        private async Task<string> HighlightQueryAsync(string text, string query)
+        {
+            return await Task.Run(() =>
+                Regex.Replace(text, Regex.Escape(query), $"<mark>{query}</mark>", RegexOptions.IgnoreCase)
+            );
+        }
+
+
+        public async Task<string> SpecialLanguageAsync(string result, string query)
+        {
+            result = await HighlightQueryAsync(result, query);
+            string pattern = @"[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]+";
+            string highlightedResult = Regex.Replace(result, pattern, match =>
+            {
+                return $"<span class=\"special\" dir=\"rtl\">{match.Value}</span>";
+            });
+
+            return highlightedResult;
+        }
+
+
         [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
-        public IActionResult Error() =>
-            View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
+        public IActionResult Error()
+        {
+            return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
+        }
     }
 }
