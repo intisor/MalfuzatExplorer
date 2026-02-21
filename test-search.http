@@ -1,0 +1,42 @@
+# MalfuzatExplorer – HTTP Test File
+# Inspired by AmsaAPI's test-auth.http pattern.
+# Open in VS Code with the REST Client extension (humao.rest-client) and click "Send Request".
+
+@baseUrl = https://localhost:7023
+
+###
+# Check if the PDF cache is ready before searching
+GET {{baseUrl}}/Home/CacheStatus
+Accept: application/json
+
+###
+# Basic Arabic search
+POST {{baseUrl}}/Home/Search
+Content-Type: application/x-www-form-urlencoded
+
+Query=%D9%86%D9%85%D8%A7%D8%B2&__RequestVerificationToken=
+
+###
+# Basic English/transliterated search
+POST {{baseUrl}}/Home/Search
+Content-Type: application/x-www-form-urlencoded
+
+Query=salat&__RequestVerificationToken=
+
+###
+# Search that should return no results
+POST {{baseUrl}}/Home/Search
+Content-Type: application/x-www-form-urlencoded
+
+Query=zzznomatchzzz&__RequestVerificationToken=
+
+###
+# XSS probe — response must NOT contain unencoded <script> tag
+POST {{baseUrl}}/Home/Search
+Content-Type: application/x-www-form-urlencoded
+
+Query=%3Cscript%3Ealert(1)%3C%2Fscript%3E&__RequestVerificationToken=
+
+###
+# Rate-limit probe — send 11 rapid requests to verify HTTP 429 on the 11th
+# (run via PowerShell: 1..11 | ForEach-Object { Invoke-WebRequest -Uri "{{baseUrl}}/Home/Search" -Method POST -Body "Query=test" })
