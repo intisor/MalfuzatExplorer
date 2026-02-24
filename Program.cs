@@ -3,6 +3,12 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 
+// In-process result cache: stores up to 500 search result entries
+builder.Services.AddMemoryCache(options =>
+{
+    options.SizeLimit = 500;
+});
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
