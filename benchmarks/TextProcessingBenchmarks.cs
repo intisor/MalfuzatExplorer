@@ -17,11 +17,10 @@ namespace MalfuzatExplorer.Benchmarks;
 public class TextProcessingBenchmarks
 {
     private const string BaseParagraph =
-        "حضرت صاحب نے فرمایا کہ اسلام ایک کامل اور مکمل دین ہے جو انسانیت کی ہر ضرورت کو پورا کرتا ہے۔ " +
-        "مسجد میں نماز پڑھنا اور اجتماعی عبادت کرنا مسلمانوں کے لیے بہت اہم ہے اور اس سے اتحاد پیدا ہوتا ہے۔ " +
-        "قرآن کریم اللہ تعالیٰ کا کلام ہے جو حضرت محمد صلی اللہ علیہ وسلم پر نازل ہوا اور قیامت تک محفوظ ہے۔ " +
+        "\u062d\u0636\u0631\u062a \u0635\u0627\u062d\u0628 \u0646\u06d2 \u0641\u0631\u0645\u0627\u06cc\u0627 \u06a9\u06c1 \u0627\u0633\u0644\u0627\u0645 \u0627\u06cc\u06a9 \u06a9\u0627\u0645\u0644 \u0627\u0648\u0631 \u0645\u06a9\u0645\u0644 \u062f\u06cc\u0646 \u06c1\u06d2 \u062c\u0648 \u0627\u0646\u0633\u0627\u0646\u06cc\u062a \u06a9\u06cc \u06c1\u0631 \u0636\u0631\u0648\u0631\u062a \u06a9\u0648 \u067e\u0648\u0631\u0627 \u06a9\u0631\u062a\u0627 \u06c1\u06d2\u06d4 " +
+        "\u0645\u0633\u062c\u062f \u0645\u06cc\u06ba \u0646\u0645\u0627\u0632 \u067e\u0691\u06be\u0646\u0627 \u0627\u0648\u0631 \u0627\u062c\u062a\u0645\u0627\u0639\u06cc \u0639\u0628\u0627\u062f\u062a \u06a9\u0631\u0646\u0627 \u0645\u0633\u0644\u0645\u0627\u0646\u0648\u06ba \u06a9\u06d2 \u0644\u06cc\u06d2 \u0628\u06c1\u062a \u0627\u06c1\u0645 \u06c1\u06d2\u06d4 " +
         "The Promised Messiah (peace be upon him) taught that true faith requires both belief and righteous action. " +
-        "اللہ تعالیٰ کی رحمت اور مغفرت تمام گناہگاروں کے لیے کھلی ہے بشرطیکہ وہ سچے دل سے توبہ کریں۔ ";
+        "\u0627\u0644\u0644\u06c1 \u062a\u0639\u0627\u0644\u06b0\u06cc\u0670 \u06a9\u06cc \u0631\u062d\u0645\u062a \u0627\u0648\u0631 \u0645\u063a\u0641\u0631\u062a \u062a\u0645\u0627\u0645 \u06af\u0646\u0627\u06c1\u06af\u0627\u0631\u0648\u06ba \u06a9\u06d2 \u0644\u06cc\u06d2 \u06a9\u06be\u0644\u06cc \u06c1\u06d2\u06d4 ";
 
     private static readonly string ShortText  = string.Concat(Enumerable.Repeat(BaseParagraph,  2));
     private static readonly string MediumText = string.Concat(Enumerable.Repeat(BaseParagraph,  8));
@@ -35,8 +34,8 @@ public class TextProcessingBenchmarks
     [Params("Short", "Medium", "Long")]
     public string ContentSize { get; set; } = "Medium";
 
-    [Params("حضرت", "مسجد")]
-    public string Query { get; set; } = "حضرت";
+    [Params("\u062d\u0636\u0631\u062a", "\u0645\u0633\u062c\u062f")]
+    public string Query { get; set; } = "\u062d\u0636\u0631\u062a";
 
     private string _pageText = string.Empty;
 

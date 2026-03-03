@@ -10,6 +10,8 @@ public class BenchmarkConfig : ManualConfig
 {
     public BenchmarkConfig()
     {
+        // UnrollFactor=1 + InvocationCount=1 are required for Task-returning
+        // benchmarks — BenchmarkDotNet cannot unroll async state machines.
         AddJob(Job.Default
             .WithWarmupCount(2)
             .WithIterationCount(7)
@@ -25,6 +27,8 @@ public class BenchmarkConfig : ManualConfig
 
         AddLogger(ConsoleLogger.Default);
         AddExporter(MarkdownExporter.GitHub);
+
+        // Benchmarks run in Release mode — optimisations validator is redundant.
         WithOptions(ConfigOptions.DisableOptimizationsValidator);
     }
 }
