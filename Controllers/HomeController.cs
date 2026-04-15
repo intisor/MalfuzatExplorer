@@ -205,7 +205,7 @@ namespace MalfuzatExplorer.Controllers
             if (idx < 0) return "Query not found";
 
             int start = Math.Max(0, idx - 100);
-            int end = Math.Min(words.Length, idx + 100 + query.Length);
+            int end = Math.Min(words.Length, idx + 101);
             return string.Join(" ", words.Skip(start).Take(end - start));
         }
 
@@ -214,13 +214,13 @@ namespace MalfuzatExplorer.Controllers
                 $"<mark>{query}</mark>", RegexOptions.IgnoreCase);
 
         // ── Highlight ONCE, then wrap Arabic runs in RTL span ───────────────
-        public Task<string> SpecialLanguageAsync(string result, string query) =>
-            Task.Run(() =>
-            {
-                string highlighted = HighlightQuery(result, query);
-                return _arabicRegex.Replace(highlighted,
-                    m => $"<span class=\"special\" dir=\"rtl\">{m.Value}</span>");
-            });
+        public Task<string> SpecialLanguageAsync(string result, string query)
+        {
+            string highlighted = HighlightQuery(result, query);
+            string wrapped = _arabicRegex.Replace(highlighted,
+                m => $"<span class=\"special\" dir=\"rtl\">{m.Value}</span>");
+            return Task.FromResult(wrapped);
+        }
 
         [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
         public IActionResult Error() =>
