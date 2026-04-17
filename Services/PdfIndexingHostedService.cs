@@ -25,7 +25,7 @@ public sealed class PdfIndexingHostedService : BackgroundService
     ];
 
     // Cache file lives next to the PDFs in wwwroot/Malfuzat/
-    private const string CacheFileName = "embedding-cache.json";
+    private const string CacheFileName = "embedding-2-cache.json";
 
     private readonly PdfIndexer _indexer;
     private readonly VectorIndexService _vectorIndex;

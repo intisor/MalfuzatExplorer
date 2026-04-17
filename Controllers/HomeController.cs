@@ -152,61 +152,30 @@ namespace MalfuzatExplorer.Controllers
 
         public IActionResult Privacy() => View();
 
-        // ── Parallel search across all volumes ─────────────────────────────
+        // ── Fast Semantic Search using Pre-computed Gemini Vectors ─────────────────────────────
         public async Task<List<string>> SearchPdfForQueryAsync(string query)
         {
-            var tasks = _pdfFiles
-                .Select(f => PdfPath(f))
-                .Where(System.IO.File.Exists)
-                .Select(path => SearchSinglePdfAsync(path, query));
-
-            var resultSets = await Task.WhenAll(tasks);
-            return [.. resultSets.SelectMany(r => r)];
-        }
-
-        // ── Each volume searched on its own thread ──────────────────────────
-        private Task<List<string>> SearchSinglePdfAsync(string pdfPath, string query) =>
-            Task.Run(() =>
+            try
             {
-                var results = new List<string>();
-                try
+                if (!_vectorIndex.IsReady)
                 {
-                    using var reader = new PdfReader(pdfPath);
-                    using var document = new PdfDocument(reader);
-
-                    for (int i = 1; i <= document.GetNumberOfPages(); i++)
-                    {
-                        string pageText = PdfTextExtractor.GetTextFromPage(document.GetPage(i));
-                        if (pageText.Contains(query, StringComparison.OrdinalIgnoreCase))
-                        {
-                            string context = GetContextAroundQuery(pageText, query);
-                            results.Add(
-                                $"Found in {Path.GetFileNameWithoutExtension(pdfPath)} on leaf {i}: {context}");
-                        }
-                    }
+                    return ["The semantic index is still building. Please try again in a moment."];
                 }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error reading PDF: {Path}", pdfPath);
-                }
-                return results;
-            });
 
-        // ── Synchronous helpers (no unnecessary Task.Run allocation) ────────
-        private static string GetContextAroundQuery(string content, string query)
-        {
-            query = query.Trim();
-            string[] words = content.Split(
-                new[] { ' ', '\n', '\r', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                // 1. Convert user text query to vector
+                float[] queryVector = await _gemini.EmbedAsync(query, "RETRIEVAL_QUERY");
+                
+                // 2. Perform Cosine Similarity across the cached PDFs
+                var topChunks = _vectorIndex.Search(queryVector, topN: 10);
 
-            int idx = Array.FindIndex(words,
-                w => w.Contains(query, StringComparison.OrdinalIgnoreCase));
-
-            if (idx < 0) return "Query not found";
-
-            int start = Math.Max(0, idx - 100);
-            int end = Math.Min(words.Length, idx + 101);
-            return string.Join(" ", words.Skip(start).Take(end - start));
+                // 3. Map back to the UI list-of-strings format
+                return topChunks.Select(c => $"Found in {c.Volume} on leaf {c.Page}: {c.Text}").ToList();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Semantic search failed for query: {Query}", query);
+                return [];
+            }
         }
 
         private static string HighlightQuery(string text, string query) =>

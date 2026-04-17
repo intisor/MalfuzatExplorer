@@ -18,7 +18,7 @@ namespace MalfuzatExplorer.Services;
 public sealed class GeminiEmbeddingService
 {
     // ── Constants from the Google AI docs ──────────────────────────────────
-    private const string Model = "gemini-embedding-001";
+    private const string Model = "gemini-embedding-2-preview";
     private const string BaseUrl = "https://generativelanguage.googleapis.com/v1beta/models/";
     private const int MaxRetry = 3;
 
@@ -59,10 +59,18 @@ public sealed class GeminiEmbeddingService
         if (text.Length > 4000)
             text = text[..4000];
 
+        // Apply Embeddings 2 explicit prompt formatting instead of sending a taskType parameter
+        string formattedText = taskType switch 
+        {
+            "RETRIEVAL_DOCUMENT" => $"title: Malfuzat Document | text: {text}",
+            "RETRIEVAL_QUERY" => $"task: search result | query: {text}",
+            _ => text
+        };
+
         var url = $"{BaseUrl}{Model}:embedContent?key={_apiKey}";
 
         // ── Build the JSON body exactly as the docs specify ─────────────
-        var body = new EmbedRequest(taskType, new Content([new Part(text)]));
+        var body = new EmbedRequest(new Content([new Part(formattedText)]));
 
         for (int attempt = 1; attempt <= MaxRetry; attempt++)
         {
@@ -100,7 +108,6 @@ public sealed class GeminiEmbeddingService
     // ── Request / Response shapes (mirroring the REST API body exactly) ──
 
     private record EmbedRequest(
-        [property: JsonPropertyName("taskType")] string TaskType,
         [property: JsonPropertyName("content")] Content Content);
 
     private record Content(
