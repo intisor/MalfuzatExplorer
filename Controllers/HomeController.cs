@@ -1,7 +1,6 @@
 using iText.Kernel.Pdf;
 using iText.Kernel.Pdf.Canvas.Parser;
 using MalfuzatExplorer.Models;
-using MalfuzatExplorer.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Memory;
 using System.Diagnostics;
@@ -26,21 +25,15 @@ namespace MalfuzatExplorer.Controllers
         private readonly IMemoryCache _cache;
         private readonly ILogger<HomeController> _logger;
         private readonly IWebHostEnvironment _env;
-        private readonly VectorIndexService _vectorIndex;
-        private readonly GeminiEmbeddingService _gemini;
 
         public HomeController(
             IMemoryCache cache,
             ILogger<HomeController> logger,
-            IWebHostEnvironment env,
-            VectorIndexService vectorIndex,
-            GeminiEmbeddingService gemini)
+            IWebHostEnvironment env)
         {
             _cache = cache;
             _logger = logger;
             _env = env;
-            _vectorIndex = vectorIndex;
-            _gemini = gemini;
         }
 
         // Returns the full path for a given volume filename.
@@ -49,73 +42,12 @@ namespace MalfuzatExplorer.Controllers
 
         public IActionResult Index()
         {
-            // Tell the view whether the semantic index is ready
-            // so it can show a "Building index…" banner if not
-            var model = new MalfuzatModel { IndexReady = _vectorIndex.IsReady };
-            return View(model);
+            return View(new MalfuzatModel());
         }
-
-        // ── SEMANTIC SEARCH ─────────────────────────────────────────────────
-        // LEARNING: This action:
-        //   1. Embeds the user's query with taskType RETRIEVAL_QUERY
-        //   2. Runs cosine similarity against all stored chunk embeddings
-        //   3. Returns the top 10 most semantically similar passages
-        [HttpPost]
-        public async Task<IActionResult> SemanticSearch(MalfuzatModel model)
-        {
-            model.SemanticMode = true;
-            model.IndexReady = _vectorIndex.IsReady;
-
-            if (string.IsNullOrWhiteSpace(model.Query))
-            {
-                ModelState.AddModelError("", "Please enter a search query.");
-                return View("Index", model);
-            }
-
-            if (!_gemini.IsConfigured)
-            {
-                model.Results = ["Semantic search is unavailable: Gemini API key not configured."];
-                return View("Index", model);
-            }
-
-            if (!_vectorIndex.IsReady)
-            {
-                model.Results = ["The semantic index is still building. Please try again in a moment."];
-                return View("Index", model);
-            }
-
-            try
-            {
-                // Step 1: Convert the user's query into a vector
-                // We use RETRIEVAL_QUERY (docs: optimizes for querying stored documents)
-                float[] queryVector = await _gemini.EmbedAsync(model.Query, "RETRIEVAL_QUERY");
-
-                // Step 2: Compare against all stored chunk vectors; take top 10
-                var topChunks = _vectorIndex.Search(queryVector, topN: 10);
-
-                // Step 3: Build the result objects the view will display
-                model.SemanticResults = topChunks
-                    .Select(c => new SemanticResult
-                    {
-                        Volume = c.Volume,
-                        Page = c.Page,
-                        Snippet = c.Text
-                    })
-                    .ToList();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Semantic search failed for query: {Query}", model.Query);
-                model.Results = [$"Semantic search error: {ex.Message}"];
-            }
-
-            return View("Index", model);
-        }
-
         [HttpPost]
         public async Task<IActionResult> Search(MalfuzatModel model)
         {
-            if (string.IsNullOrWhiteSpace(model.Query))
+                  if (string.IsNullOrWhiteSpace(model.Query))
             {
                 ModelState.AddModelError("", "Please enter a valid search query.");
                 return View("Index", model);
@@ -152,30 +84,43 @@ namespace MalfuzatExplorer.Controllers
 
         public IActionResult Privacy() => View();
 
-        // ── Fast Semantic Search using Pre-computed Gemini Vectors ─────────────────────────────
         public async Task<List<string>> SearchPdfForQueryAsync(string query)
         {
-            try
-            {
-                if (!_vectorIndex.IsReady)
+            var results = new List<string>();
+            await Task.Run(() => {
+                foreach (var vol in _pdfFiles)
                 {
-                    return ["The semantic index is still building. Please try again in a moment."];
+                    var path = PdfPath(vol);
+                    if (!System.IO.File.Exists(path)) continue;
+
+                    try 
+                    {
+                        using var pdfDoc = new PdfDocument(new PdfReader(path));
+                        int numPages = pdfDoc.GetNumberOfPages();
+
+                        for (int i = 1; i <= numPages; i++)
+                        {
+                            var page = pdfDoc.GetPage(i);
+                            var text = PdfTextExtractor.GetTextFromPage(page);
+
+                            if (!string.IsNullOrEmpty(text) && text.Contains(query, StringComparison.OrdinalIgnoreCase))
+                            {
+                                var matchIndex = text.IndexOf(query, StringComparison.OrdinalIgnoreCase);
+                                int start = Math.Max(0, matchIndex - 50);
+                                int length = Math.Min(text.Length - start, query.Length + 100);
+                                string snippet = text.Substring(start, length).Replace("\n", " ").Replace("\r", "");
+                                
+                                results.Add($"Volume: {vol}, Page: {i} - ...{snippet}...");
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error reading {Volume}", vol);
+                    }
                 }
-
-                // 1. Convert user text query to vector
-                float[] queryVector = await _gemini.EmbedAsync(query, "RETRIEVAL_QUERY");
-                
-                // 2. Perform Cosine Similarity across the cached PDFs
-                var topChunks = _vectorIndex.Search(queryVector, topN: 10);
-
-                // 3. Map back to the UI list-of-strings format
-                return topChunks.Select(c => $"Found in {c.Volume} on leaf {c.Page}: {c.Text}").ToList();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Semantic search failed for query: {Query}", query);
-                return [];
-            }
+            });
+            return results;
         }
 
         private static string HighlightQuery(string text, string query) =>

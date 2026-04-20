@@ -1,15 +1,17 @@
-namespace MalfuzatExplorer.Services;
+namespace MalfuzatExplorer.Services
+{
+    public class ChunkResult
+    {
+        // Example: "Malfuzat-1.pdf"
+        public string Volume { get; set; } = string.Empty; 
 
-/// <summary>
-/// Represents a paragraph-sized chunk of text extracted from a PDF volume,
-/// along with the embedding vector Gemini produced for it.
-/// 
-/// WHY A RECORD? Records are immutable value types — perfect for data
-/// that is written once at index time and only read after that.
-/// </summary>
-public sealed record ChunkResult(
-    string Volume,      // e.g. "Malfuzat-3"
-    int Page,        // 1-based page number inside the PDF
-    string Text,        // the raw chunk text (~300 words)
-    float[] Embedding   // 768-dimensional vector from Gemini
-);
+        // The page number this text was found on
+        public int Page { get; set; } 
+
+        // The actual extracted piece of text
+        public string Text { get; set; } = string.Empty; 
+
+        // The 256-dimensional mathematical representation of the text
+        public float[] Vector { get; set; } = Array.Empty<float>();
+    }
+}
