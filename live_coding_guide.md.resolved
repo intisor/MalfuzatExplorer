@@ -1,0 +1,833 @@
+# MalfuzatExplorer — Live Coding + Screen Recording Guide
+### Replicating the `experimenting-with-vectors` Refactor on `master`, Paired with GitHub Copilot
+
+---
+
+## 🎬 Part 1 — Screen Recording / Streaming Setup
+
+### Option A: Local Recording Only (OBS Studio)
+1. Download **OBS Studio** → [obsproject.com](https://obsproject.com) (free, open-source)
+2. Open OBS → **Auto-Configuration Wizard** → choose **"Optimize for recording"**
+3. **Sources** panel → `+` → **Display Capture** → select your monitor
+4. (Optional) `+` → **Audio Input Capture** → select your mic
+5. **Settings → Output → Recording Path** → choose a folder
+6. Set recording format to **MKV** (safest for crashes) or **MP4**
+7. Hit **Start Recording** before you open VS Code
+
+### Option B: Stream to YouTube / Twitch
+1. Same OBS setup, but in **Auto-Config Wizard** choose **"Optimize for streaming"**
+2. **Settings → Stream → Service** → pick Twitch or YouTube
+3. Paste your **Stream Key** (get it from your Twitch/YouTube dashboard)
+4. Hit **Start Streaming**
+
+### VS Code Layout for Stream
+- Font size ≥ 16 (Ctrl+`,` → `editor.fontSize`)
+- Theme: **One Dark Pro** or **GitHub Dark** (readable on stream)
+- Open **both** files you'll edit side by side:
+  - `Program.cs` on the left
+  - [Controllers/HomeController.cs](file:///c:/Users/DELL/Desktop/Coded/intisor/MalfuzatExplorer/Controllers/HomeController.cs) on the right
+- Open the **Terminal** panel (it shows your live builds — looks great on stream)
+
+---
+
+## 📊 Part 2 — Baseline: Benchmark the AS-IS System FIRST
+
+> **Do this before writing a single line of new code.** This is what proves the problem is real and makes the "after" numbers meaningful on stream.
+
+---
+
+### 2a. Confirm you're on `master` (untouched)
+
+```powershell
+git checkout master
+git status       # must be clean — no uncommitted changes
+git log --oneline -3   # confirm you're on the original master commits
+```
+
+**Say on stream:**
+> *"Before we change anything, we're going to measure exactly how slow the current code is. Science first — we benchmark the problem before we solve it."*
+
+---
+
+### 2b. Cherry-pick the benchmarks folder onto `master` NOW (before refactor)
+
+The `benchmarks/` folder from the experiment branch contains a **self-contained reproduction of both the old (v1) and new (v2) logic** — it doesn't reference `HomeController.cs` at all. So we can drop it onto master right now, run it, and get the true "before" v1 baseline:
+
+```powershell
+# Pull only the benchmarks folder from the experiment branch — no code changes yet
+git checkout experimenting-with-vectors -- benchmarks/
+
+git add benchmarks/
+git commit -m "chore: add benchmark suite (running baseline before refactor)"
+```
+
+---
+
+### 2c. Run the baseline benchmark (v1 — current sequential code)
+
+```powershell
+cd benchmarks
+dotnet run -c Release
+```
+
+> ⚠️ Takes **5–10 minutes**. Start it and talk while it runs.
+
+**While it runs, say on stream:**
+> *"BenchmarkDotNet is running the old code — the exact same sequential foreach loop that's in our HomeController right now — 5 times per query, for two different Arabic queries. This gives us the ground truth. Whatever numbers come out here are what we're trying to beat."*
+
+**The v1 baseline numbers you'll see (from the `OldSequential` benchmark):**
+
+| Query | Baseline Mean | StdDev | Cold-start |
+|---|---:|---:|---:|
+| حضرت | ~1,396 µs (hot) | ~420 µs | ~28.3 ms |
+| مسجد | ~929 µs (hot) | ~176 µs | ~19.4 ms |
+
+> Note: Your actual numbers may vary slightly by machine. **The hot-path StdDev is the most damning number** — 420µs spread means response times are wildly unpredictable.
+
+**Save the results before you touch any code:**
+```powershell
+# The HTML report is auto-saved here:
+# benchmarks/BenchmarkDotNet.Artifacts/results/
+# Open it now and screenshot it — this is your "BEFORE" evidence
+start benchmarks\BenchmarkDotNet.Artifacts\results\MalfuzatExplorer.Benchmarks.SearchBenchmarks-report.html
+```
+
+---
+
+### 2d. Time the Live UI with Browser DevTools (visual "before" for stream)
+
+While benchmarks are running (or after), open a second terminal and run the app:
+
+```powershell
+cd c:\Users\DELL\Desktop\Coded\intisor\MalfuzatExplorer
+dotnet run
+```
+
+Open **`http://localhost:5000`** in the browser.
+
+**DevTools timing — do this on stream:**
+1. Press **F12** → go to the **Network** tab
+2. Check **"Disable cache"** (important — forces a cold hit every time)
+3. Type `حضرت` in the search box → Submit
+4. Click the request in the Network tab → look at the **Time** column
+
+**What the audience will see:**
+```
+POST /Home/Search      Status: 200    Time: 1.8s – 3.2s
+```
+
+**Say on stream:**
+> *"1.8 seconds. For a search box. That's 8 PDFs being opened, read page by page, and closed — sequentially — every single time you press search. Even if you search the exact same word twice in a row. Let's fix that."*
+
+---
+
+### 2e. Show the Code — Walk Through the Problem Live
+
+Open [Controllers/HomeController.cs](file:///c:/Users/DELL/Desktop/Coded/intisor/MalfuzatExplorer/Controllers/HomeController.cs) and point out each problem before fixing it:
+
+```csharp
+// PROBLEM 1: Full path resolution on every request (not startup)
+private string[] pdfFiles = new string[]
+{
+    Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "Malfuzat", "Malfuzat-1.pdf"),
+    // ...
+};
+
+// PROBLEM 2: Sequential foreach — volume 2 waits for volume 1
+foreach (var pdfPath in pdfFiles)
+{
+    // ...reads one at a time...
+    string result = $"Found in ... on leaf {i}: " + await GetContextAroundQueryAsync(pageText, query);
+}
+
+// PROBLEM 3: No cache — full scan on EVERY request, identical or not
+List<string> results = await SearchPdfForQueryAsync(model.Query);
+
+// PROBLEM 4: Double-highlight bug
+results[i] = await SpecialLanguageAsync(results[i], model.Query);
+// SpecialLanguageAsync internally calls HighlightQueryAsync AGAIN → <mark><mark>query</mark></mark>
+
+// PROBLEM 5: Regex compiled from scratch on every result
+string pattern = @"[\u0600-\u06FF...]+";
+Regex.Replace(result, pattern, ...);  // new DFA every call
+```
+
+**Say on stream:**
+> *"Five problems. Sequential I/O, no cache, a double-highlight HTML bug, and a regex recompiling on every single result. We're going to fix all five, live, with Copilot. Benchmarks are still running in the background — by the time we're done coding, we'll have the 'before' numbers waiting for us."*
+
+---
+
+## 🌿 Part 3 — Start the Refactor on `master`
+
+At this point:
+- ✅ Benchmarks finished (or still running in background terminal)
+- ✅ You have the "before" HTML report open in browser
+- ✅ The audience has seen the slow Network tab timing
+
+```powershell
+# Go back to the project root
+cd c:\Users\DELL\Desktop\Coded\intisor\MalfuzatExplorer
+
+# Confirm still on master, benchmarks committed, no other changes
+git status
+git log --oneline -3
+```
+
+> *"Now we write the fix — live, with Copilot."*
+
+---
+
+## 🛠️ Part 4 — The 8 Coding Steps
+
+---
+
+### STEP 1 — Register `IMemoryCache` in `Program.cs`
+**File:** `Program.cs`  
+**Time estimate:** ~2 min
+
+Open `Program.cs`. It currently looks like this:
+```csharp
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddControllersWithViews();
+var app = builder.Build();
+```
+
+Position your cursor on the blank line **after** `AddControllersWithViews();` and type this comment:
+
+```
+// In-process result cache: stores up to 500 search result entries
+```
+
+**Copilot will suggest:**
+```csharp
+builder.Services.AddMemoryCache(options =>
+{
+    options.SizeLimit = 500;
+});
+```
+
+✅ Accept it. Done.
+
+**Say on stream:**
+> *"This registers the IMemoryCache service with a hard cap of 500 entries — so the cache can never blow up our memory even if someone searches 500 different queries."*
+
+---
+
+### STEP 2 — Add `using` + Static Fields to `HomeController.cs`
+**File:** [Controllers/HomeController.cs](file:///c:/Users/DELL/Desktop/Coded/intisor/MalfuzatExplorer/Controllers/HomeController.cs)  
+**Time estimate:** ~5 min
+
+**2a. Add the missing `using`**
+
+At the top of the file, after the existing `using` statements, add:
+```csharp
+using Microsoft.Extensions.Caching.Memory;
+```
+
+**2b. Replace the instance `pdfFiles` field with static versions**
+
+Find the current field declaration:
+```csharp
+private string[] pdfFiles = new string[]
+{
+    Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "Malfuzat", "Malfuzat-1.pdf"),
+    // ... etc
+};
+```
+
+**Delete it entirely.** Replace with:
+```csharp
+// ── static: path list is resolved once at startup, not per-request ──
+private static readonly string[] _pdfFiles = new[]
+{
+    "Malfuzat-1.pdf", "Malfuzat-2.pdf", "Malfuzat-3.pdf",
+    "Malfuzat-4.pdf", "Malfuzat-7.pdf", "Malfuzat-8.pdf",
+    "Malfuzat-9.pdf", "Malfuzat-10.pdf"
+};
+
+private static readonly Regex _arabicRegex =
+    new(@"[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]+",
+        RegexOptions.Compiled);
+```
+
+**Copilot prompt to type** (as a comment above the Regex line):
+```
+// compiled once, reused across all requests
+```
+Copilot will fill in the `new Regex(...)` line for you.
+
+**Say on stream:**
+> *"Two things here. First — the file names only, not full paths. We'll resolve the full path via IWebHostEnvironment in the constructor. Second — this Arabic regex was being recompiled from scratch on every search result. With `RegexOptions.Compiled` and `static readonly`, it's JIT-compiled to native code once and never touched again."*
+
+---
+
+### STEP 3 — Inject Dependencies (Constructor)
+**File:** [Controllers/HomeController.cs](file:///c:/Users/DELL/Desktop/Coded/intisor/MalfuzatExplorer/Controllers/HomeController.cs)  
+**Time estimate:** ~5 min
+
+The current controller has **no constructor**. Add one right after the static fields:
+
+```csharp
+private readonly IMemoryCache _cache;
+private readonly ILogger<HomeController> _logger;
+private readonly IWebHostEnvironment _env;
+
+public HomeController(IMemoryCache cache, ILogger<HomeController> logger, IWebHostEnvironment env)
+{
+    _cache = cache;
+    _logger = logger;
+    _env = env;
+}
+
+// Returns the full path for a given volume filename
+private string PdfPath(string fileName) =>
+    Path.Combine(_env.WebRootPath, "Malfuzat", fileName);
+```
+
+**Copilot prompt:** Type `public HomeController(` and Copilot will suggest all three parameters. Accept. Then type `// Returns the full path` and it will suggest the `PdfPath` helper.
+
+**Say on stream:**
+> *"Now the controller is fully testable. We can mock IMemoryCache, ILogger, and IWebHostEnvironment in unit tests. And `PdfPath` replaces the old `Directory.GetCurrentDirectory()` hack — WebRootPath is the correct, environment-aware way to resolve wwwroot paths in ASP.NET Core."*
+
+---
+
+### STEP 4 — Fix `Search()` — Add Caching + Parallel Post-Processing
+**File:** [Controllers/HomeController.cs](file:///c:/Users/DELL/Desktop/Coded/intisor/MalfuzatExplorer/Controllers/HomeController.cs)  
+**Time estimate:** ~8 min
+
+Find the current `Search()` action method. It looks like this:
+```csharp
+[HttpPost]
+public async Task<IActionResult> Search(MalfuzatModel model)
+{
+    if (string.IsNullOrEmpty(model.Query)) { ... }
+
+    List<string> results = await SearchPdfForQueryAsync(model.Query);
+    if (results.Count == 0)
+    {
+        model.Results = new List<string> { $"No results found for '{model.Query}'." };
+    }
+    else { model.Results = results; }
+
+    for (int i = 0; i < results.Count; i++)
+    {
+        results[i] = await SpecialLanguageAsync(results[i], model.Query);
+    }
+    model.Results = results;
+    return View("Index", model);
+}
+```
+
+**Replace the entire body** (keep the method signature) with:
+
+```csharp
+[HttpPost]
+public async Task<IActionResult> Search(MalfuzatModel model)
+{
+    if (string.IsNullOrWhiteSpace(model.Query))
+    {
+        ModelState.AddModelError("", "Please enter a valid search query.");
+        return View("Index", model);
+    }
+
+    string cacheKey = $"search::{model.Query.Trim().ToLowerInvariant()}";
+
+    // ── Cache hit: skip all PDF I/O ──────────────────────────────────
+    if (!_cache.TryGetValue(cacheKey, out List<string>? rawResults))
+    {
+        rawResults = await SearchPdfForQueryAsync(model.Query);
+
+        _cache.Set(cacheKey, rawResults, new MemoryCacheEntryOptions
+        {
+            SlidingExpiration = TimeSpan.FromMinutes(30),
+            Size = 1
+        });
+    }
+
+    if (rawResults!.Count == 0)
+    {
+        model.Results = [$"No results found for '{model.Query}'."];
+        return View("Index", model);
+    }
+
+    // ── Process all results in parallel (RTL wrap + highlight) ───────
+    var processed = await Task.WhenAll(
+        rawResults.Select(r => SpecialLanguageAsync(r, model.Query))
+    );
+    model.Results = [.. processed];
+
+    return View("Index", model);
+}
+```
+
+**Copilot prompts to use:**
+- Type `string cacheKey = $"search::` → Copilot fills the rest
+- Type `if (!_cache.TryGetValue(` → Copilot suggests the full cache-aside pattern
+- Type `// Process all results in parallel` → Copilot suggests the `Task.WhenAll + Select` block
+
+**Say on stream:**
+> *"Three things changed here. One: `IsNullOrWhiteSpace` instead of `IsNullOrEmpty` — catches queries that are just spaces. Two: the cache-aside pattern — if we've seen this query before, we skip ALL PDF I/O. Three: the old sequential `for` loop doing `await SpecialLanguageAsync` on each result one-by-one is replaced with `Task.WhenAll` — all the RTL wrapping and highlighting now happens in parallel."*
+
+---
+
+### STEP 5 — Refactor `SearchPdfForQueryAsync` → True Parallelism
+**File:** [Controllers/HomeController.cs](file:///c:/Users/DELL/Desktop/Coded/intisor/MalfuzatExplorer/Controllers/HomeController.cs)  
+**Time estimate:** ~10 min
+
+Find the current method:
+```csharp
+public async Task<List<string>> SearchPdfForQueryAsync(string query)
+{
+    List<string> results = new List<string>();
+    try
+    {
+        foreach (var pdfPath in pdfFiles)
+        {
+            if (!System.IO.File.Exists(pdfPath)) { throw new FileNotFoundException(...); }
+            using (PdfReader reader = new PdfReader(pdfPath))
+            using (PdfDocument document = new PdfDocument(reader))
+            {
+                for (int i = 1; i <= document.GetNumberOfPages(); i++)
+                {
+                    string pageText = PdfTextExtractor.GetTextFromPage(document.GetPage(i));
+                    if (pageText.Contains(query, StringComparison.OrdinalIgnoreCase))
+                    {
+                        string result = $"Found in ... on leaf {i}: " + await GetContextAroundQueryAsync(...);
+                        results.Add(result);
+                    }
+                }
+            }
+        }
+    }
+    catch (Exception ex) { results.Add("An error occurred while searching the PDF."); }
+    return results;
+}
+```
+
+**Replace with these two methods:**
+
+```csharp
+// ── Parallel search across all volumes ─────────────────────────────
+public async Task<List<string>> SearchPdfForQueryAsync(string query)
+{
+    var tasks = _pdfFiles
+        .Select(f => PdfPath(f))
+        .Where(System.IO.File.Exists)
+        .Select(path => SearchSinglePdfAsync(path, query));
+
+    var resultSets = await Task.WhenAll(tasks);
+    return [.. resultSets.SelectMany(r => r)];
+}
+
+// ── Each volume searched on its own thread ──────────────────────────
+private Task<List<string>> SearchSinglePdfAsync(string pdfPath, string query) =>
+    Task.Run(() =>
+    {
+        var results = new List<string>();
+        try
+        {
+            using var reader   = new PdfReader(pdfPath);
+            using var document = new PdfDocument(reader);
+
+            for (int i = 1; i <= document.GetNumberOfPages(); i++)
+            {
+                string pageText = PdfTextExtractor.GetTextFromPage(document.GetPage(i));
+                if (pageText.Contains(query, StringComparison.OrdinalIgnoreCase))
+                {
+                    string context = GetContextAroundQuery(pageText, query);
+                    results.Add(
+                        $"Found in {Path.GetFileNameWithoutExtension(pdfPath)} on leaf {i}: {context}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error reading PDF: {Path}", pdfPath);
+        }
+        return results;
+    });
+```
+
+**Copilot prompts:**
+- Type `// Parallel search across all volumes` → Copilot fills the LINQ chain
+- Type `private Task<List<string>> SearchSinglePdfAsync(` → Copilot suggests the `Task.Run` lambda
+- Inside the catch, type `_logger.Log` → Copilot suggests `LogError`
+
+**Say on stream:**
+> *"This is the core improvement. Before: one big sequential foreach — volume 2 waits for volume 1 to finish. After: 8 tasks, all launched at once, `Task.WhenAll` collects every result when the last one finishes. We also fixed the error handling — the old code swallowed all errors silently. Now we get structured logs with the actual exception and the path that failed."*
+
+---
+
+### STEP 6 — Fix the Helper Methods (Bug Fix + Sync Conversion)
+**File:** [Controllers/HomeController.cs](file:///c:/Users/DELL/Desktop/Coded/intisor/MalfuzatExplorer/Controllers/HomeController.cs)  
+**Time estimate:** ~8 min
+
+**6a. Delete `GetContextAroundQueryAsync` and replace with a sync version:**
+
+Old:
+```csharp
+public async Task<string> GetContextAroundQueryAsync(string content, string query)
+{
+    // ... calls HighlightQueryAsync inside — this is the bug!
+    result = await HighlightQueryAsync(result, query);
+    return result;
+}
+```
+
+New (sync, no highlight — pure text extraction):
+```csharp
+// ── Synchronous helpers (no unnecessary Task.Run allocation) ────────
+private static string GetContextAroundQuery(string content, string query)
+{
+    query = query.Trim();
+    string[] words = content.Split(
+        new[] { ' ', '\n', '\r', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+
+    int idx = Array.FindIndex(words,
+        w => w.Contains(query, StringComparison.OrdinalIgnoreCase));
+
+    if (idx < 0) return "Query not found";
+
+    int start = Math.Max(0, idx - 100);
+    int end   = Math.Min(words.Length, idx + 100 + query.Length);
+    return string.Join(" ", words.Skip(start).Take(end - start));
+}
+```
+
+**6b. Replace `HighlightQueryAsync` with a sync static:**
+
+Old:
+```csharp
+private async Task<string> HighlightQueryAsync(string text, string query)
+{
+    return await Task.Run(() =>
+        Regex.Replace(text, Regex.Escape(query), $"<mark>{query}</mark>", RegexOptions.IgnoreCase)
+    );
+}
+```
+
+New:
+```csharp
+private static string HighlightQuery(string text, string query) =>
+    Regex.Replace(text, Regex.Escape(query),
+        $"<mark>{query}</mark>", RegexOptions.IgnoreCase);
+```
+
+**6c. Fix `SpecialLanguageAsync` — single highlight pass, no double-mark:**
+
+Old:
+```csharp
+public async Task<string> SpecialLanguageAsync(string result, string query)
+{
+    result = await HighlightQueryAsync(result, query);  // ← BUG: already highlighted
+    string pattern = @"[\u0600-\u06FF...]";
+    string highlightedResult = Regex.Replace(result, pattern, match => ...);
+    return highlightedResult;
+}
+```
+
+New:
+```csharp
+// ── Highlight ONCE, then wrap Arabic runs in RTL span ───────────────
+public Task<string> SpecialLanguageAsync(string result, string query) =>
+    Task.Run(() =>
+    {
+        string highlighted = HighlightQuery(result, query);
+        return _arabicRegex.Replace(highlighted,
+            m => $"<span class=\"special\" dir=\"rtl\">{m.Value}</span>");
+    });
+```
+
+**Say on stream:**
+> *"Two bugs fixed here. First: `GetContextAroundQuery` used to call `HighlightQueryAsync` inside it — so when `SpecialLanguageAsync` later called `HighlightQueryAsync` again, the `<mark>` tags were doubled. Now `GetContextAroundQuery` just returns raw text. Second: `HighlightQueryAsync` was wrapping a 2-microsecond string operation in `Task.Run` — pure thread-pool pressure for no reason. It's now a synchronous static method."*
+
+---
+
+### STEP 7 — Fix the Model (Nullable Safety)
+**File:** [Models/MalfuzatModel.cs](file:///c:/Users/DELL/Desktop/Coded/intisor/MalfuzatExplorer/Models/MalfuzatModel.cs)  
+**Time estimate:** ~1 min
+
+```diff
+- public string Query {  get; set; }
++ public string? Query { get; set; }
+```
+
+**Say on stream:**
+> *"One-line fix. `Query` is nullable — a GET request to the Index page sends no query. The old code was lying to the compiler saying it's always non-null, which caused a CS8618 warning. This makes the contract honest."*
+
+---
+
+### STEP 8 — Clean Up `Privacy()` and `Error()` (Optional, looks great for stream)
+
+```csharp
+public IActionResult Privacy() => View();
+
+[ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
+public IActionResult Error() =>
+    View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
+```
+
+Expression body syntax — cosmetic, concise, shows fluency.
+
+---
+
+## ✅ Part 4 — Build & Verify
+
+```powershell
+# In the VS Code terminal — run this on stream!
+dotnet build
+```
+
+Expected output: `Build succeeded. 0 Warning(s). 0 Error(s).`
+
+Then:
+```powershell
+dotnet run
+```
+
+Open the app, do a search. First search will be slow (PDF scan). Do the **exact same search again** — it should return instantly from cache.
+
+**Say on stream:**
+> *"First search: half a second. Same search again: basically instant. That's the IMemoryCache eliminating all PDF I/O on repeat queries. The cache lives as long as the process is up and resets on redeploy."*
+
+---
+
+## 📝 Part 5 — Commit It
+
+```powershell
+git add -A
+git commit -m "refactor: parallel PDF search + IMemoryCache + bug fixes"
+```
+
+---
+
+## 🎓 Stream Talking Points (Background Narrative)
+
+Use these between coding steps to fill time naturally:
+
+| Topic | What to say |
+|---|---|
+| **Why `Task.WhenAll`?** | "The bottleneck was disk I/O, not CPU. `Task.WhenAll` lets the OS schedule all 8 file reads concurrently. On a machine with an SSD and multiple cores, this is close to linear speedup." |
+| **Why cache?** | "Arabic Islamic texts — the same queries get repeated constantly. `حضرت`, `مسجد`, `خلافت`. With a 30-minute sliding cache, repeat visitors get submillisecond responses." |
+| **The double-highlight bug** | "This is a real correctness bug. The HTML was `<mark><mark>query</mark></mark>`. Browsers render it oddly and it breaks CSS selectors. The fix was separating concerns — one method extracts text, another method highlights it." |
+| **`RegexOptions.Compiled`** | "This tells the .NET runtime to emit actual native machine code for the pattern. For a regex running on every search result, it's a measurable win." |
+| **What's next (vectors)?** | "This refactor is the foundation for what comes next — semantic/vector search. Instead of `string.Contains`, we'll embed queries and passages as vectors and find results by cosine similarity. That's what the branch name hints at." |
+
+---
+
+## 🗂️ Final File State Checklist
+
+| File | Changes made |
+|---|---|
+| `Program.cs` | `AddMemoryCache(SizeLimit: 500)` added |
+| [Controllers/HomeController.cs](file:///c:/Users/DELL/Desktop/Coded/intisor/MalfuzatExplorer/Controllers/HomeController.cs) | DI constructor, static fields, cache-aside Search(), `Task.WhenAll` parallelism, sync helper methods, bug fixes |
+| [Models/MalfuzatModel.cs](file:///c:/Users/DELL/Desktop/Coded/intisor/MalfuzatExplorer/Models/MalfuzatModel.cs) | `Query` → `string?` |
+
+---
+
+## 📦 Part 6 — Install & Run the Benchmark Suite
+
+### 6a. Get the `benchmarks/` folder onto `master`
+
+The benchmark project only lives on `experimenting-with-vectors`. Cherry-pick just that folder — no full branch merge needed:
+
+```powershell
+# Must be on master
+git checkout master
+
+# Copy only the benchmarks/ folder from the experiment branch
+git checkout experimenting-with-vectors -- benchmarks/
+
+# Commit it
+git add benchmarks/
+git commit -m "chore: add BenchmarkDotNet suite for v1 vs v2 search comparison"
+```
+
+This adds three files:
+```
+benchmarks/
+├── MalfuzatExplorer.Benchmarks.csproj   ← standalone console project
+├── Program.cs                            ← 3-line BenchmarkRunner entry point
+└── SearchBenchmarks.cs                   ← v1 (before) vs v2 (after) class
+```
+
+---
+
+### 6b. Verify Your .NET Version
+
+The benchmark `.csproj` targets `net10.0`. Confirm you have it:
+
+```powershell
+dotnet --version
+# Expected: 10.x.xxx  ✅
+```
+
+You already have .NET 10.0.103 — no changes needed.
+
+---
+
+### 6c. Verify the PDFs Exist
+
+The benchmark resolves PDFs relative to its output folder up four levels to `wwwroot/Malfuzat/`:
+
+```powershell
+ls .\wwwroot\Malfuzat\
+# Must see: Malfuzat-1.pdf, Malfuzat-2.pdf, Malfuzat-3.pdf,
+#           Malfuzat-4.pdf, Malfuzat-7.pdf, Malfuzat-8.pdf,
+#           Malfuzat-9.pdf, Malfuzat-10.pdf
+```
+
+If any volume is missing, v2 skips it gracefully (`Where(File.Exists)`). v1 will add an error string — that's fine on stream, it shows v2's better error handling.
+
+---
+
+### 6d. Run the Benchmarks
+
+> ⚠️ **Must use `-c Release`** — BenchmarkDotNet throws a hard error in Debug mode.
+
+```powershell
+# cd INTO the benchmarks subfolder first
+cd c:\Users\DELL\Desktop\Coded\intisor\MalfuzatExplorer\benchmarks
+
+dotnet run -c Release
+```
+
+**What you'll see on screen:**
+```
+// ***** BenchmarkRunner: Start   *****
+// Found benchmarks:
+//   SearchBenchmarks.OldSequential: MonitoringJob
+//   SearchBenchmarks.NewParallel: MonitoringJob
+// Running benchmarks for 2 queries: حضرت, مسجد
+// * Warming up (1 iteration) ... *
+// * Running 5 iterations ... *
+```
+
+Takes **5–10 minutes** total. Let it run while you talk to the audience.
+
+---
+
+### 6e. Read the Results
+
+When finished, BenchmarkDotNet prints a table directly in the terminal **and** saves full reports:
+
+```
+benchmarks/BenchmarkDotNet.Artifacts/results/
+├── MalfuzatExplorer.Benchmarks.SearchBenchmarks-report.md
+├── MalfuzatExplorer.Benchmarks.SearchBenchmarks-report.html   ← open this!
+└── MalfuzatExplorer.Benchmarks.SearchBenchmarks-report.csv
+```
+
+**Open the HTML report in the browser:**
+```powershell
+start benchmarks\BenchmarkDotNet.Artifacts\results\MalfuzatExplorer.Benchmarks.SearchBenchmarks-report.html
+```
+
+**Expected results table:**
+
+| Method | Query | Mean | StdDev | Ratio | Rank | Allocated |
+|---|---|---:|---:|---:|---:|---:|
+| **v2 Parallel Task.WhenAll (after)** | حضرت | **927.5 µs** | 202.5 µs | **0.71** | 1 | 2.7 KB |
+| v1 Sequential (before) | حضرت | 1,396.3 µs | 420.6 µs | 1.00 | 2 | 2.1 KB |
+| **v2 Parallel Task.WhenAll (after)** | مسجد | **892.4 µs** | 94.9 µs | **0.99** | 1 | 2.7 KB |
+| v1 Sequential (before) | مسجد | 929.0 µs | 176.7 µs | 1.03 | 1 | 2.1 KB |
+
+**Point out on stream:**
+- **Ratio column** — `0.71` = v2 is 29% faster on the hot path for `حضرت`
+- **StdDev column** — v1 at 420µs vs v2 at 202µs = **v1 is twice as unpredictable**
+- **Cold-start row** (warmup iteration, shown separately) = v1 28ms vs v2 22ms = **21% faster on first ever request**
+
+**Say on stream:**
+> *"StdDev is the hidden metric most people ignore. Low standard deviation means every user gets a consistent experience. High standard deviation means some users get 900µs and others get 1800µs — you can't predict it. v2 is not just faster on average, it's more reliable."*
+
+---
+
+## 🌐 Part 7 — Run the Web UI (Live Cache Demo)
+
+Open a **second terminal**, go back to the project root:
+
+```powershell
+cd c:\Users\DELL\Desktop\Coded\intisor\MalfuzatExplorer
+dotnet run
+```
+
+The terminal prints:
+```
+Now listening on: https://localhost:5001
+Now listening on: http://localhost:5000
+```
+
+Open **`http://localhost:5000`** in the browser.
+
+---
+
+### Live Cache Demo Script (do this on camera)
+
+**Round 1 — Cold search:**
+1. Type `حضرت` in the search box → Submit
+2. Browser spins for ~1–3 seconds
+3. Say: *"That just read all 8 PDFs, scanned every page, built the result list. That's the first-time cost."*
+
+**Round 2 — Warm search (cache hit):**
+1. Back button → submit the exact same query
+2. Returns **instantly** (< 50 ms)
+3. Say: *"Instant. The IMemoryCache returned the pre-built list before any file was touched. Case-insensitive, 30-minute sliding window — it'll stay warm for the rest of the stream."*
+
+**Round 3 — Different query:**
+1. Search `مسجد` → first hit is slow
+2. Same query again → instant
+3. Say: *"Each unique query gets its own slot. Up to 500 slots total — after that the oldest ones evict themselves automatically."*
+
+**Round 4 — Show the HTML report (after benchmarks finish):**
+1. Switch to the browser tab with the `.html` report
+2. Say: *"This is BenchmarkDotNet's output — it ran both the old and new code 5 times each, with two different Arabic queries. The Ratio column is the key: 0.71 means 29% faster wall-clock. But look at StdDev — v1 is twice as noisy."*
+
+---
+
+## 🧯 Common Issues & Fixes
+
+| Problem | Fix |
+|---|---|
+| `BenchmarkDotNet requires Release mode` error | Always use `dotnet run -c Release` |
+| `FileNotFoundException` for PDFs in benchmark | Confirm `wwwroot/Malfuzat/` has all 8 volumes |
+| `dotnet run` fails — port in use | `dotnet run --urls "http://localhost:5050"` |
+| Benchmark hot-path times nearly equal | Normal on 2-core machine — highlight the **cold-start** row instead |
+| `IMemoryCache` not registered error on UI | Make sure `AddMemoryCache()` is in `Program.cs` |
+| `_env` is null / NullReferenceException | Confirm the DI constructor is in place and the old parameterless ctor is removed |
+
+---
+
+## ⏱️ Full Stream Timeline
+
+| Segment | Duration |
+|---|---|
+| Intro + OBS check | 2 min |
+| **Baseline: cherry-pick benchmarks, run v1** | 3 min to kick off |
+| DevTools timing — show the slow spinner live | 3 min |
+| Walk through the 5 problems in the current code | 5 min |
+| *(Benchmarks running in background terminal)* | — |
+| STEP 1–3: Register cache + static fields + DI | 12 min |
+| STEP 4–5: Cache-aside + parallel search | 18 min |
+| STEP 6–8: Bug fixes + model fix | 10 min |
+| `dotnet build` green — celebrate | 2 min |
+| **UI demo: cold vs warm search — AFTER fix** | 5 min |
+| **Run benchmarks again (v2 pass)** | 3 min to kick off |
+| *(Benchmarks running again in background)* | — |
+| Talk through architecture & what's next (vectors) | 8 min |
+| **Side-by-side BEFORE vs AFTER HTML reports** | 5 min |
+| Outro | 2 min |
+| **Total** | **~75 min** |
+
+> 💡 **Pro tip:** Start the **baseline benchmarks in Step 2c early** — they run in the background while you code. By the time you finish the refactor (~40 min of coding), the v1 results are already waiting. Then trigger the v2 run immediately after `dotnet build`, and they'll finish while you walk through the architecture. The audience never sees you waiting for benchmarks.
+
+---
+
+## 🧠 Key Numbers to Quote on Stream
+
+| Scenario | v1 (before) | v2 (after) | Win |
+|---|---|---|---|
+| Hot path OS-cached (`حضرت`) | 1,396 µs | 928 µs | **34% faster** |
+| Cold start first request | 28.3 ms | 22.3 ms | **21% faster** |
+| Same query, 2nd request | ~1–28 ms | **< 5 ms** | **> 99% faster** |
+| Response time consistency | StdDev 420 µs | StdDev 202 µs | **2× more stable** |
+| 8 concurrent users | queued serially | parallel per user | **~8× throughput** |

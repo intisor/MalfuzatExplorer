@@ -1,0 +1,66 @@
+@model MalfuzatExplorer.Models.MalfuzatModel
+@{
+    ViewData["Title"] = "Malfuzat Explorer - Semantic Search";
+}
+
+<div class="search-container">
+    <div class="premium-card text-center">
+        <h1 class="display-4">Malfuzat Explorer</h1>
+        <p class="search-subtitle">Deep Semantic Search across the Blessed Discourses</p>
+
+        <form asp-action="Search" method="post" class="mt-4">
+            <div class="input-group">
+                <input type="text" name="Query" value="@Model.Query" 
+                       class="form-control form-control-premium" 
+                       placeholder="e.g. What did the Promised Messiah (as) say about prayer?" 
+                       autocomplete="off" />
+                <button type="submit" class="btn btn-premium ms-2">
+                    <i class="bi bi-search"></i> Search
+                </button>
+            </div>
+            @if (!ViewData.ModelState.IsValid)
+            {
+                <div class="text-danger mt-2">@Html.ValidationSummary(true)</div>
+            }
+        </form>
+    </div>
+
+    @if (Model.Results != null && Model.Results.Count > 0)
+    {
+        <div class="results-list">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h4 class="mb-0">Found @Model.Results.Count matches</h4>
+                <span class="text-muted small">Powered by Gemini AI</span>
+            </div>
+
+            @for (int i = 0; i < Model.Results.Count; i++)
+            {
+                <div class="result-item" style="animation-delay: @(i * 0.1)s">
+                    <div class="snippet-text">
+                        @Html.Raw(Model.Results[i])
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else if (Model.Query != null)
+    {
+        <div class="text-center mt-5">
+            <p class="text-muted italic">No specific matches found for "@Model.Query". Try rephrasing your search.</p>
+        </div>
+    }
+</div>
+
+@section Scripts {
+    <script>
+        // Simple fade-out for preloader if it exists
+        window.addEventListener('load', function() {
+            const preloader = document.getElementById('preloader');
+            if (preloader) {
+                preloader.style.transition = 'opacity 0.5s ease';
+                preloader.style.opacity = '0';
+                setTimeout(() => preloader.style.display = 'none', 500);
+            }
+        });
+    </script>
+}
