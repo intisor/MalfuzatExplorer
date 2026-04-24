@@ -4,8 +4,11 @@ using MalfuzatExplorer.Models;
 using MalfuzatExplorer.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.Hosting;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
+using System.Linq;
 
 namespace MalfuzatExplorer.Controllers
 {
