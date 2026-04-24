@@ -1,6 +1,7 @@
 using iText.Kernel.Pdf;
 using iText.Kernel.Pdf.Canvas.Parser;
 using MalfuzatExplorer.Models;
+using MalfuzatExplorer.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Memory;
 using System.Diagnostics;

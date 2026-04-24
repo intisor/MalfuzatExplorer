@@ -37,6 +37,10 @@ namespace MalfuzatExplorer.Services
 
             foreach (var chunk in _knowledgeBase)
             {
+                // Skip chunks that don't have vectors (e.g. if indexing failed for them)
+                if (chunk.Vector == null || chunk.Vector.Length != queryVector.Length)
+                    continue;
+
                 // The Cosine Similarity math we learned in Phase 1!
                 float similarity = VectorMath.CosineSimilarity(queryVector, chunk.Vector);
                 results.Add((chunk, similarity));
